@@ -1,0 +1,137 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_-]+$');
+    }
+
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() > 0 && data.displayName.size() <= 50 &&
+             data.avatarId is string && data.avatarId.size() > 0 && data.avatarId.size() <= 100 &&
+             data.coinBalance is int && data.coinBalance >= 0 &&
+             data.winningsBalance is int && data.winningsBalance >= 0 &&
+             data.gamesWon is int && data.gamesWon >= 0 &&
+             data.gamesPlayed is int && data.gamesPlayed >= 0;
+    }
+
+    function isValidGameMatch(data) {
+      return data.matchId is string && data.matchId.size() > 0 && data.matchId.size() <= 128 &&
+             data.creatorId is string && data.creatorId.size() > 0 && data.creatorId.size() <= 128 &&
+             data.status in ['waiting', 'in_progress', 'completed', 'cancelled'] &&
+             data.gameMode in ['bot', 'multiplayer_quick', 'room_code'] &&
+             data.entryFee is int && data.entryFee >= 0 &&
+             data.prizePool is int && data.prizePool >= 0 &&
+             data.playerIds is list && data.playerIds.size() >= 1 && data.playerIds.size() <= 4 &&
+             (!('winnerId' in data) || data.winnerId == null || (data.winnerId is string && data.winnerId.size() <= 128)) &&
+             data.currentTurnPlayerId is string && data.currentTurnPlayerId.size() <= 128 &&
+             data.lastDiceRoll is int && data.lastDiceRoll >= 0 && data.lastDiceRoll <= 6 &&
+             data.boardStateJson is string && data.boardStateJson.size() <= 50000;
+    }
+
+    function isValidChatMessage(data) {
+      return data.messageId is string && data.messageId.size() > 0 && data.messageId.size() <= 128 &&
+             data.matchId is string && data.matchId.size() > 0 && data.matchId.size() <= 128 &&
+             data.senderId is string && data.senderId == request.auth.uid &&
+             data.senderName is string && data.senderName.size() > 0 && data.senderName.size() <= 50 &&
+             data.avatarId is string && data.avatarId.size() > 0 && data.avatarId.size() <= 100 &&
+             data.text is string && data.text.size() > 0 && data.text.size() <= 500;
+    }
+
+    function isValidWalletTransaction(data) {
+      return data.transactionId is string && data.transactionId.size() > 0 && data.transactionId.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.type in ['deposit', 'withdrawal', 'reward_win', 'match_entry'] &&
+             data.amount is int && data.amount > 0 &&
+             data.status in ['success', 'pending', 'processing'] &&
+             data.paymentMethod is string && data.paymentMethod.size() > 0 && data.paymentMethod.size() <= 50;
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId);
+      allow list: if isSignedIn() && request.auth.uid == userId;
+
+      allow create: if isSignedIn() &&
+                       request.auth.uid == userId &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().createdAt is timestamp &&
+                       incoming().createdAt <= request.time &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isSignedIn() &&
+                       request.auth.uid == userId &&
+                       incoming().userId == existing().userId &&
+                       isValidUserProfile(incoming());
+
+      allow delete: if false;
+
+      // User wallet transactions
+      match /transactions/{transactionId} {
+        allow get, list: if isSignedIn() && request.auth.uid == userId && isValidId(transactionId);
+        allow create: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().createdAt is timestamp &&
+                         incoming().createdAt <= request.time &&
+                         isValidWalletTransaction(incoming());
+        allow update, delete: if false;
+      }
+    }
+
+    // Matches
+    match /matches/{matchId} {
+      allow get: if isSignedIn() && isValidId(matchId);
+      allow list: if isSignedIn() && (resource.data.creatorId == request.auth.uid || request.auth.uid in resource.data.playerIds);
+
+      allow create: if isSignedIn() &&
+                       isValidId(matchId) &&
+                       incoming().matchId == matchId &&
+                       incoming().creatorId == request.auth.uid &&
+                       request.auth.uid in incoming().playerIds &&
+                       incoming().createdAt is timestamp &&
+                       incoming().createdAt <= request.time &&
+                       isValidGameMatch(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(matchId) &&
+                       (request.auth.uid in existing().playerIds || request.auth.uid in incoming().playerIds) &&
+                       incoming().matchId == existing().matchId &&
+                       incoming().creatorId == existing().creatorId &&
+                       isValidGameMatch(incoming());
+
+      allow delete: if isSignedIn() && existing().creatorId == request.auth.uid && existing().status == 'waiting';
+
+      // Realtime in-game chat messages
+      match /messages/{messageId} {
+        allow get, list: if isSignedIn() && isValidId(messageId);
+        allow create: if isSignedIn() &&
+                         isValidId(messageId) &&
+                         incoming().messageId == messageId &&
+                         incoming().matchId == matchId &&
+                         incoming().senderId == request.auth.uid &&
+                         incoming().createdAt is timestamp &&
+                         incoming().createdAt <= request.time &&
+                         isValidChatMessage(incoming());
+        allow update, delete: if false;
+      }
+    }
+  }
+}

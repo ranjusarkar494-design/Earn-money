@@ -1,0 +1,90 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account profile and balance details",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "avatarId": { "type": "string" },
+        "coinBalance": { "type": "integer" },
+        "winningsBalance": { "type": "integer" },
+        "gamesWon": { "type": "integer" },
+        "gamesPlayed": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Client must submit FieldValue.serverTimestamp()" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Client must submit FieldValue.serverTimestamp()" }
+      },
+      "required": ["userId", "displayName", "avatarId", "coinBalance", "winningsBalance", "gamesWon", "gamesPlayed", "createdAt", "updatedAt"]
+    },
+    "GameMatch": {
+      "title": "GameMatch",
+      "description": "A multiplayer or bot Ludo match",
+      "type": "object",
+      "properties": {
+        "matchId": { "type": "string" },
+        "creatorId": { "type": "string" },
+        "status": { "type": "string", "enum": ["waiting", "in_progress", "completed", "cancelled"] },
+        "gameMode": { "type": "string", "enum": ["bot", "multiplayer_quick", "room_code"] },
+        "entryFee": { "type": "integer" },
+        "prizePool": { "type": "integer" },
+        "playerIds": { "type": "array" },
+        "winnerId": { "type": "string" },
+        "currentTurnPlayerId": { "type": "string" },
+        "lastDiceRoll": { "type": "integer" },
+        "boardStateJson": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Client must submit FieldValue.serverTimestamp()" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Client must submit FieldValue.serverTimestamp()" }
+      },
+      "required": ["matchId", "creatorId", "status", "gameMode", "entryFee", "prizePool", "playerIds", "currentTurnPlayerId", "lastDiceRoll", "boardStateJson", "createdAt", "updatedAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "In-game chat message in a match",
+      "type": "object",
+      "properties": {
+        "messageId": { "type": "string" },
+        "matchId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "avatarId": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Client must submit FieldValue.serverTimestamp()" }
+      },
+      "required": ["messageId", "matchId", "senderId", "senderName", "avatarId", "text", "createdAt"]
+    },
+    "WalletTransaction": {
+      "title": "WalletTransaction",
+      "description": "User wallet deposit, withdrawal, or reward record",
+      "type": "object",
+      "properties": {
+        "transactionId": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["deposit", "withdrawal", "reward_win", "match_entry"] },
+        "amount": { "type": "integer" },
+        "status": { "type": "string", "enum": ["success", "pending", "processing"] },
+        "paymentMethod": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Client must submit FieldValue.serverTimestamp()" }
+      },
+      "required": ["transactionId", "userId", "type", "amount", "status", "paymentMethod", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profile, avatar preference, and wallet stats"
+    },
+    "/matches/{matchId}": {
+      "schema": { "$ref": "#/entities/GameMatch" },
+      "description": "Multiplayer and bot Ludo matches"
+    },
+    "/matches/{matchId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ChatMessage" },
+      "description": "Real-time in-game chat messages"
+    },
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/WalletTransaction" },
+      "description": "User payment and rewards transaction history"
+    }
+  }
+}

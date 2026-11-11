@@ -1,0 +1,6 @@
+{
+  "name": "Ludo Royale",
+  "description": "Multiplayer Ludo with AI Bot battles, custom player avatars, live chat, and rewards system.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
